@@ -209,7 +209,7 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
     <!-- MESSAGE -->
     <div class="sec fade-in">
       <div class="msg">
-        교회에서 처음 만나 친구가 되었던 두 사람,<br>하나님의 때에 다시 만나 사랑이 되었습니다.<br>긴 기다림도, 짧은 설렘도<br>모두 그분의 계획이었기에<br>이제 한 몸이 되어 감사로 걸어가려 합니다.<br><br>소중한 분들의 축복 속에 혼인을 올리오니<br>부디 오셔서 기쁨을 함께 나눠주세요.
+        교회에서 처음 만나 친구가 되었던 두 사람,<br>하나님의 때에 다시 만나 사랑이 되었습니다.<br>긴 기다림도, 짧은 설렘도 모두 그분의 계획이었기에<br>이제 한 몸이 되어 감사로 걸어가려 합니다.<br><br>소중한 분들의 축복 속에 혼인을 올리오니<br>부디 오셔서 기쁨을 함께 나눠주세요.
       </div>
     </div>
 
@@ -279,7 +279,6 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
           <strong style="color:#3a2a10;font-weight:400;">아모리스홀</strong>
         </div>
         <a class="map-btn" href="https://map.naver.com/v5/search/루이비스컨벤션" target="_blank">네이버 지도로 보기</a>
-        <a class="map-btn" href="https://maps.google.com/?q=루이비스컨벤션+서울+송파구" target="_blank" style="margin-left:8px;">구글 지도로 보기</a>
       </div>
     </div>
 
@@ -414,24 +413,37 @@ window.addEventListener('load', () => {
       document.getElementById('music-btn').textContent = '⏸';
       playing = true;
     }).catch(() => {
-      // 자동재생 차단된 경우 첫 터치 시 재생
-      document.addEventListener('touchstart', function startOnTouch() {
-        bgm.play().then(() => {
-          document.getElementById('music-btn').textContent = '⏸';
-          playing = true;
-        });
-        document.removeEventListener('touchstart', startOnTouch);
-      }, { once: true });
-      document.addEventListener('click', function startOnClick() {
-        bgm.play().then(() => {
-          document.getElementById('music-btn').textContent = '⏸';
-          playing = true;
-        });
-        document.removeEventListener('click', startOnClick);
-      }, { once: true });
+      // 자동재생 차단 시 오버레이 표시
+      showPlayOverlay();
     });
-  }, 800);
+  }, 500);
 });
+
+function showPlayOverlay() {
+  const overlay = document.createElement('div');
+  overlay.id = 'play-overlay';
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:10000;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(253,248,240,0.92);backdrop-filter:blur(6px);
+  `;
+  overlay.innerHTML = `
+    <div style="text-align:center;">
+      <div style="font-size:52px;color:#c9a84c;margin-bottom:16px;cursor:pointer;" id="play-circle">▶</div>
+      <div style="font-size:13px;color:#8a7040;font-family:'Cormorant Garamond',serif;letter-spacing:0.1em;">터치하여 시작하기</div>
+    </div>
+  `;
+  overlay.addEventListener('click', () => {
+    bgm.play().then(() => {
+      document.getElementById('music-btn').textContent = '⏸';
+      playing = true;
+    });
+    overlay.style.opacity = '0';
+    overlay.style.transition = 'opacity 0.5s';
+    setTimeout(() => overlay.remove(), 500);
+  });
+  document.body.appendChild(overlay);
+}
 
 function startMusic() {
   closePopup();

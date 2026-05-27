@@ -336,6 +336,16 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
 
     <div class="gold-line-full"></div>
 
+    <div class="sec fade-in" style="margin-bottom:28px;">
+      <div class="section-title">NOTICE</div>
+      <div style="text-align:center;">
+        <div style="font-size:14px;color:#b8903a;font-family:'Cormorant Garamond',serif;letter-spacing:0.05em;margin-bottom:8px;">화환은 정중히 사양합니다</div>
+        <div style="font-size:12px;color:#9a8458;font-family:'Noto Serif KR',serif;font-weight:300;">마음만으로도 충분히 감사합니다</div>
+      </div>
+    </div>
+
+    <div class="gold-line-full"></div>
+
     <!-- GUESTBOOK -->
     <div class="sec fade-in" style="margin-bottom:28px;">
       <div class="section-title">GUEST BOOK</div>
@@ -345,7 +355,7 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
       <div style="margin-bottom:8px;">
         <textarea class="gb-input" id="gb-msg" rows="3" placeholder="축하 메시지를 남겨주세요"></textarea>
       </div>
-      <button class="gb-btn" onclick="submitMsg()">축하 메시지 남기기</button>
+      <button class="gb-btn" onclick="submitMsgFirebase()">축하 메시지 남기기</button>
       <div class="gb-messages" id="gb-messages"></div>
     </div>
 
@@ -499,6 +509,49 @@ const observer = new IntersectionObserver(entries => {
   entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
 }, {threshold: 0.15});
 document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+</script>
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import { getDatabase, ref, push, onValue, query, orderByChild } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+  const firebaseConfig = {
+    databaseURL: "https://wedding-0829-default-rtdb.asia-southeast1.firebasedatabase.app"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db = getDatabase(app);
+  const gbRef = ref(db, 'guestbook');
+
+  // 방명록 불러오기
+  onValue(query(gbRef, orderByChild('timestamp')), (snapshot) => {
+    const container = document.getElementById('gb-messages');
+    container.innerHTML = '';
+    const entries = [];
+    snapshot.forEach(child => entries.unshift(child.val()));
+    entries.forEach(entry => {
+      const item = document.createElement('div');
+      item.className = 'gb-msg-item';
+      const d = new Date(entry.timestamp);
+      const dateStr = d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
+      item.innerHTML = `<div class="gb-msg-name">${entry.name}</div><div class="gb-msg-text">${entry.message}</div><div class="gb-msg-date">${dateStr}</div>`;
+      container.appendChild(item);
+    });
+  });
+
+  // 방명록 저장
+  window.submitMsgFirebase = function() {
+    const name = document.getElementById('gb-name').value.trim();
+    const msg = document.getElementById('gb-msg').value.trim();
+    if (!name || !msg) return;
+    push(gbRef, {
+      name: name,
+      message: msg,
+      timestamp: Date.now()
+    }).then(() => {
+      document.getElementById('gb-name').value = '';
+      document.getElementById('gb-msg').value = '';
+    });
+  };
 </script>
 </body>
 </html>

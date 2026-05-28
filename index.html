@@ -73,7 +73,15 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
 /* LIGHTBOX */
 .lightbox{display:none;position:fixed;inset:0;background:rgba(20,14,4,0.95);z-index:9999;align-items:center;justify-content:center;}
 .lightbox.open{display:flex;}
-.lightbox img{max-width:92vw;max-height:88vh;object-fit:contain;border:1px solid #c9a84c33;transition:none;}
+.lightbox img{max-width:92vw;max-height:88vh;object-fit:contain;border:1px solid #c9a84c33;display:block;}
+
+
+
+  20%  { clip-path: polygon(70% 100%, 100% 60%, 100% 100%); }
+  50%  { clip-path: polygon(20% 100%, 100% 10%, 100% 100%); }
+  80%  { clip-path: polygon(0% 100%, 0% 0%, 100% 0%, 100% 100%); }
+  100% { clip-path: polygon(0% 100%, 0% 0%, 100% 0%, 100% 100%); opacity: 0; }
+}
 .lightbox img.page-turn {
   animation: pageTurn 0.6s ease-in-out;
 }
@@ -85,6 +93,8 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
 }
 .lightbox-close{position:absolute;top:20px;right:24px;color:#c9a84c;font-size:28px;cursor:pointer;background:none;border:none;line-height:1;}
 .lightbox-nav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(253,248,240,0.15);border:1px solid #c9a84c44;color:#c9a84c;font-size:20px;width:44px;height:44px;display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:50%;}
+
+
 .lightbox-nav.prev{left:16px;}
 .lightbox-nav.next{right:16px;}
 
@@ -396,18 +406,52 @@ body{background:#f5efe3;font-family:'Cormorant Garamond','Noto Serif KR',serif;c
 </div>
 
 <script>
-// Images array for lightbox
+// 갤러리 변수 (맨 먼저 선언)
 const galleryImgs = Array.from(document.querySelectorAll('.gallery-item img')).map(i=>i.src);
 let currentIdx = 0;
+let autoSlideTimer = null;
+let autoScrollTimer = null;
+let autoScrollActive = false;
+const AUTO_SLIDE_DELAY = 4000;
 
+// 자동 스크롤
+function stopAutoScroll() {
+  autoScrollActive = false;
+  if (autoScrollTimer) { cancelAnimationFrame(autoScrollTimer); autoScrollTimer = null; }
+}
+
+function startAutoScroll() {
+  if (autoScrollActive) return;
+  autoScrollActive = true;
+  setTimeout(() => {
+    let lastTime = null;
+    const speed = 22;
+    function scrollStep(ts) {
+      if (!autoScrollActive) return;
+      if (!lastTime) lastTime = ts;
+      const delta = (ts - lastTime) / 1000;
+      lastTime = ts;
+      window.scrollBy(0, speed * delta);
+      if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 10) {
+        autoScrollActive = false;
+        return;
+      }
+      autoScrollTimer = requestAnimationFrame(scrollStep);
+    }
+    autoScrollTimer = requestAnimationFrame(scrollStep);
+  }, 3000);
+}
+
+// 라이트박스
 function openLight(idx) {
   currentIdx = idx;
   document.getElementById('lightbox-img').src = galleryImgs[idx];
   document.getElementById('lightbox').classList.add('open');
   document.body.style.overflow = 'hidden';
-  stopAutoScroll(); // 스크롤 멈추기
-  setTimeout(() => resetAutoSlide(), FLIP_DURATION); // 첫 사진 보고 4초 후 자동 시작
+  stopAutoScroll();
+  setTimeout(() => resetAutoSlide(), AUTO_SLIDE_DELAY);
 }
+
 function closeLight(e) {
   if(!e || e.target === document.getElementById('lightbox')) {
     document.getElementById('lightbox').classList.remove('open');
@@ -415,60 +459,84 @@ function closeLight(e) {
     if (autoSlideTimer) { clearInterval(autoSlideTimer); autoSlideTimer = null; }
   }
 }
-let autoSlideTimer = null;
-let isFlipping = false;
-const FLIP_DURATION = 2000; // 2초 넘기기
-const AUTO_SLIDE_DELAY = 4000; // 4초마다 자동 넘기기
-
-function doPageFlip(callback) {
-  if (isFlipping) return;
-  isFlipping = true;
-
-  // 오버레이 생성
-  const overlay = document.createElement('div');
-  overlay.className = 'page-flip-overlay';
-  const page = document.createElement('div');
-  page.className = 'flip-page';
-  overlay.appendChild(page);
-  document.body.appendChild(overlay);
-
-  // 1초 뒤 사진 교체 (넘기는 중간에)
-  setTimeout(() => {
-    if (callback) callback();
-  }, FLIP_DURATION * 0.5);
-
-  // 애니메이션 끝나면 제거
-  setTimeout(() => {
-    overlay.remove();
-    isFlipping = false;
-  }, FLIP_DURATION);
-}
 
 function navLight(dir) {
-  if (isFlipping) return;
-  doPageFlip(() => {
-    currentIdx = (currentIdx + dir + galleryImgs.length) % galleryImgs.length;
-    document.getElementById('lightbox-img').src = galleryImgs[currentIdx];
-
-    // 마지막 사진(15번째) 본 후 → 라이트박스 닫고 스크롤 재개
-    if (dir > 0 && currentIdx === 0) {
-      setTimeout(() => {
-        closeLight({});
-        startAutoScroll();
-      }, 1500);
-    }
-  });
+  const totalImgs = galleryImgs.length;
+  if (dir > 0 && currentIdx === totalImgs - 1) {
+    document.getElementById('lightbox').classList.remove('open');
+    document.body.style.overflow = '';
+    if (autoSlideTimer) { clearInterval(autoSlideTimer); autoSlideTimer = null; }
+    setTimeout(() => startAutoScroll(), 500);
+    return;
+  }
+  currentIdx = (currentIdx + dir + totalImgs) % totalImgs;
+  document.getElementById('lightbox-img').src = galleryImgs[currentIdx];
   resetAutoSlide();
 }
 
 function resetAutoSlide() {
   if (autoSlideTimer) clearInterval(autoSlideTimer);
   autoSlideTimer = setInterval(() => {
-    if (document.getElementById('lightbox').classList.contains('open') && !isFlipping) {
+    if (document.getElementById('lightbox').classList.contains('open')) {
       navLight(1);
     }
   }, AUTO_SLIDE_DELAY);
 }
+
+// 키보드
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape') closeLight({});
+  if(e.key==='ArrowLeft') navLight(-1);
+  if(e.key==='ArrowRight') navLight(1);
+});
+
+// 터치 슬라이드
+let touchStartX = 0;
+document.getElementById('lightbox').addEventListener('touchstart', e => {
+  touchStartX = e.changedTouches[0].screenX;
+}, { passive: true });
+document.getElementById('lightbox').addEventListener('touchend', e => {
+  const diff = touchStartX - e.changedTouches[0].screenX;
+  if (Math.abs(diff) > 50) {
+    if (diff > 0) navLight(1);
+    else navLight(-1);
+  }
+}, { passive: true });
+
+// 사용자 터치/스크롤 시 자동스크롤 정지
+window.addEventListener('touchstart', () => stopAutoScroll(), { passive: true });
+window.addEventListener('wheel', () => stopAutoScroll(), { passive: true });
+
+// 계좌 복사
+function copyText(text, el) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = el.textContent;
+    el.textContent = '✓ 복사됨';
+    el.style.color = '#c9a84c';
+    setTimeout(() => { el.textContent = orig; el.style.color = ''; }, 1800);
+  });
+}
+
+// 방명록
+function submitMsg() {
+  const name = document.getElementById('gb-name').value.trim();
+  const msg = document.getElementById('gb-msg').value.trim();
+  if (!name || !msg) return;
+  const today = new Date();
+  const d = today.getFullYear()+'.'+String(today.getMonth()+1).padStart(2,'0')+'.'+String(today.getDate()).padStart(2,'0');
+  const item = document.createElement('div');
+  item.className = 'gb-msg-item';
+  item.innerHTML = `<div class="gb-msg-name">${name}</div><div class="gb-msg-text">${msg}</div><div class="gb-msg-date">${d}</div>`;
+  document.getElementById('gb-messages').prepend(item);
+  document.getElementById('gb-name').value = '';
+  document.getElementById('gb-msg').value = '';
+}
+
+// Fade in
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
+}, {threshold: 0.15});
+document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
 
 // Music
 const bgm = document.getElementById('bgm');
@@ -481,7 +549,6 @@ window.addEventListener('load', () => {
       playing = true;
       startAutoScroll();
     }).catch(() => {
-      // 자동재생 차단 시 오버레이 표시
       showPlayOverlay();
     });
   }, 500);
@@ -490,39 +557,19 @@ window.addEventListener('load', () => {
 function showPlayOverlay() {
   const overlay = document.createElement('div');
   overlay.id = 'play-overlay';
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:10000;
-    display:flex;align-items:center;justify-content:center;
-    background:rgba(253,248,240,0.92);backdrop-filter:blur(6px);
-  `;
-  overlay.innerHTML = `
-    <div style="text-align:center;">
-      <div style="font-size:52px;color:#c9a84c;margin-bottom:16px;cursor:pointer;" id="play-circle">♡</div>
-      <div style="font-size:13px;color:#8a7040;font-family:'Cormorant Garamond',serif;letter-spacing:0.1em;">터치하여 두 사람의 이야기 속으로</div>
-    </div>
-  `;
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;background:rgba(253,248,240,0.92);backdrop-filter:blur(6px);';
+  overlay.innerHTML = '<div style="text-align:center;"><div style="font-size:52px;color:#c9a84c;margin-bottom:16px;cursor:pointer;">♡</div><div style="font-size:13px;color:#8a7040;font-family:Cormorant Garamond,serif;letter-spacing:0.1em;">터치하여 두 사람의 이야기 속으로</div></div>';
   overlay.addEventListener('click', () => {
     bgm.play().then(() => {
       document.getElementById('music-btn').textContent = '⏸';
       playing = true;
+      startAutoScroll();
     });
     overlay.style.opacity = '0';
     overlay.style.transition = 'opacity 0.5s';
     setTimeout(() => overlay.remove(), 500);
   });
   document.body.appendChild(overlay);
-}
-
-function startMusic() {
-  closePopup();
-  bgm.play().then(() => {
-    document.getElementById('music-btn').textContent = '⏸';
-    playing = true;
-  }).catch(e => console.log('재생 실패:', e));
-}
-
-function closePopup() {
-  document.getElementById('music-popup').style.display = 'none';
 }
 
 function toggleMusic() {
@@ -537,117 +584,17 @@ function toggleMusic() {
   }
 }
 
-// Copy
-function copyText(text, el) {
-  navigator.clipboard.writeText(text).then(() => {
-    const orig = el.textContent;
-    el.textContent = '✓ 복사됨';
-    el.style.color = '#c9a84c';
-    setTimeout(() => { el.textContent = orig; el.style.color = ''; }, 1800);
-  });
-}
-
-// Guestbook
-function submitMsg() {
+window.submitMsgFirebase = function() {
   const name = document.getElementById('gb-name').value.trim();
   const msg = document.getElementById('gb-msg').value.trim();
-  if(!name || !msg) return;
-  const today = new Date();
-  const d = today.getFullYear()+'.'+String(today.getMonth()+1).padStart(2,'0')+'.'+String(today.getDate()).padStart(2,'0');
-  const item = document.createElement('div');
-  item.className = 'gb-msg-item';
-  item.innerHTML = `<div class="gb-msg-name">${name}</div><div class="gb-msg-text">${msg}</div><div class="gb-msg-date">${d}</div>`;
-  document.getElementById('gb-messages').prepend(item);
-  document.getElementById('gb-name').value = '';
-  document.getElementById('gb-msg').value = '';
-}
-
-// Fade in on scroll
-const observer = new IntersectionObserver(entries => {
-  entries.forEach(e => { if(e.isIntersecting) e.target.classList.add('visible'); });
-}, {threshold: 0.15});
-document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-</script>
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getDatabase, ref, push, onValue, query, orderByChild } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
-
-  const firebaseConfig = {
-    databaseURL: "https://wedding-0829-default-rtdb.asia-southeast1.firebasedatabase.app"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db = getDatabase(app);
-  const gbRef = ref(db, 'guestbook');
-
-  // 방명록 불러오기
-  onValue(query(gbRef, orderByChild('timestamp')), (snapshot) => {
-    const container = document.getElementById('gb-messages');
-    container.innerHTML = '';
-    const entries = [];
-    snapshot.forEach(child => entries.unshift(child.val()));
-    entries.forEach(entry => {
-      const item = document.createElement('div');
-      item.className = 'gb-msg-item';
-      const d = new Date(entry.timestamp);
-      const dateStr = d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' + String(d.getDate()).padStart(2,'0');
-      item.innerHTML = `<div class="gb-msg-name">${entry.name}</div><div class="gb-msg-text">${entry.message}</div><div class="gb-msg-date">${dateStr}</div>`;
-      container.appendChild(item);
-    });
-  });
-
-  // 방명록 저장
-  
-// 자동 스크롤 (음악 재생 시 천천히 내려감)
-let autoScrollTimer = null;
-let autoScrollActive = false;
-
-function startAutoScroll() {
-  if (autoScrollActive) return;
-  autoScrollActive = true;
-  // 4초 뒤에 시작 (청첩장 내용 먼저 보이게)
-  setTimeout(() => {
-    let lastTime = null;
-    const speed = 22; // px/second (천천히)
-    function scrollStep(timestamp) {
-      if (!autoScrollActive) return;
-      if (!lastTime) lastTime = timestamp;
-      const delta = (timestamp - lastTime) / 1000;
-      lastTime = timestamp;
-      window.scrollBy(0, speed * delta);
-      // 하단 도달 시 정지
-      if (window.scrollY + window.innerHeight >= document.body.scrollHeight - 10) {
-        autoScrollActive = false;
-        return;
-      }
-      autoScrollTimer = requestAnimationFrame(scrollStep);
-    }
-    autoScrollTimer = requestAnimationFrame(scrollStep);
-  }, 3000);
-}
-
-function stopAutoScroll() {
-  autoScrollActive = false;
-  if (autoScrollTimer) { cancelAnimationFrame(autoScrollTimer); autoScrollTimer = null; }
-}
-
-// 사용자가 직접 스크롤하면 자동 스크롤 정지
-window.addEventListener('touchstart', () => stopAutoScroll(), { passive: true });
-window.addEventListener('wheel', () => stopAutoScroll(), { passive: true });
-
-window.submitMsgFirebase = function() {
-    const name = document.getElementById('gb-name').value.trim();
-    const msg = document.getElementById('gb-msg').value.trim();
-    if (!name || !msg) return;
-    push(gbRef, {
-      name: name,
-      message: msg,
-      timestamp: Date.now()
-    }).then(() => {
+  if (!name || !msg) return;
+  if (typeof push !== 'undefined' && typeof gbRef !== 'undefined') {
+    push(gbRef, { name, message: msg, timestamp: Date.now() }).then(() => {
       document.getElementById('gb-name').value = '';
       document.getElementById('gb-msg').value = '';
     });
-  };
+  }
+};
 </script>
 </body>
 </html>
